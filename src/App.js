@@ -11,8 +11,8 @@ import {
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-const SimpleLinearRegression = () => {
-  const [data, setData] = useState([
+const NeonLinearRegression = () => {
+  const [data] = useState([
     { x: 1, y: 2 },
     { x: 4, y: 4 },
   ]);
@@ -22,6 +22,7 @@ const SimpleLinearRegression = () => {
   const [currentW, setCurrentW] = useState(0);
   const [currentB, setCurrentB] = useState(0);
   const [loss, setLoss] = useState(0);
+  const [sliderValue, setSliderValue] = useState(0);
 
   const canvasRef = useRef(null);
 
@@ -30,8 +31,13 @@ const SimpleLinearRegression = () => {
   }, [data]);
 
   useEffect(() => {
-    drawContourPlot();
-  }, [bestW, bestB, currentW, currentB, data]);
+    const interpolatedW = bestW * (sliderValue / 100);
+    const interpolatedB = bestB * (sliderValue / 100);
+    setCurrentW(interpolatedW);
+    setCurrentB(interpolatedB);
+    setLoss(calculateLoss(interpolatedW, interpolatedB));
+    drawContourPlot(interpolatedW, interpolatedB);
+  }, [sliderValue, bestW, bestB, data]);
 
   const calculateBestFit = () => {
     const n = data.length;
@@ -45,8 +51,6 @@ const SimpleLinearRegression = () => {
     
     setBestW(newBestW);
     setBestB(newBestB);
-    setCurrentW(newBestW);
-    setCurrentB(newBestB);
   };
 
   const calculateLoss = (w, b) => {
@@ -56,7 +60,7 @@ const SimpleLinearRegression = () => {
     }, 0) / (2 * data.length);
   };
 
-  const drawContourPlot = () => {
+  const drawContourPlot = (w, b) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
@@ -73,8 +77,8 @@ const SimpleLinearRegression = () => {
     });
 
     drawLegend(ctx, contourLevels, width, height);
-    drawGradientDescentPath(ctx, width, height, wRange, bRange);
-    drawCurrentPosition(ctx, width, height, wRange, bRange);
+    drawGradientDescentPath(ctx, width, height, wRange, bRange, w, b);
+    drawCurrentPosition(ctx, width, height, wRange, bRange, w, b);
   };
 
   const drawContourLine = (ctx, width, height, wRange, bRange, level, index) => {
@@ -90,7 +94,8 @@ const SimpleLinearRegression = () => {
         }
       }
     }
-    ctx.strokeStyle = `hsla(${210 + index * 30}, 100%, 50%, ${0.3 + index * 0.1})`;
+    const hue = 180 + index * 30;
+    ctx.strokeStyle = `hsla(${hue}, 100%, 50%, 0.5)`;
     ctx.stroke();
   };
 
@@ -98,56 +103,38 @@ const SimpleLinearRegression = () => {
     contourLevels.forEach((level, index) => {
       const x = width - 60;
       const y = height - (index * 20) - 10;
-      ctx.fillStyle = `hsla(${210 + index * 30}, 100%, 50%, ${0.5 + index * 0.1})`;
+      const hue = 180 + index * 30;
+      ctx.fillStyle = `hsla(${hue}, 100%, 50%, 1)`;
       ctx.fillText(`Loss: ${level}`, x, y);
     });
   };
 
-  const drawGradientDescentPath = (ctx, width, height, wRange, bRange) => {
+  const drawGradientDescentPath = (ctx, width, height, wRange, bRange, w, b) => {
     ctx.beginPath();
     ctx.moveTo(
       ((bestW - wRange.min) / (wRange.max - wRange.min)) * width,
       height - ((bestB - bRange.min) / (bRange.max - bRange.min)) * height
     );
     ctx.lineTo(
-      ((currentW - wRange.min) / (wRange.max - wRange.min)) * width,
-      height - ((currentB - bRange.min) / (bRange.max - bRange.min)) * height
+      ((w - wRange.min) / (wRange.max - wRange.min)) * width,
+      height - ((b - bRange.min) / (bRange.max - bRange.min)) * height
     );
-    ctx.strokeStyle = 'rgba(255, 100, 100, 0.8)';
+    ctx.strokeStyle = 'rgba(255, 0, 255, 0.8)';
     ctx.lineWidth = 2;
     ctx.stroke();
   };
 
-  const drawCurrentPosition = (ctx, width, height, wRange, bRange) => {
+  const drawCurrentPosition = (ctx, width, height, wRange, bRange, w, b) => {
     ctx.beginPath();
     ctx.arc(
-      ((currentW - wRange.min) / (wRange.max - wRange.min)) * width,
-      height - ((currentB - bRange.min) / (bRange.max - bRange.min)) * height,
+      ((w - wRange.min) / (wRange.max - wRange.min)) * width,
+      height - ((b - bRange.min) / (bRange.max - bRange.min)) * height,
       5,
       0,
       2 * Math.PI
     );
-    ctx.fillStyle = 'rgba(255, 100, 100, 0.8)';
+    ctx.fillStyle = 'rgba(255, 0, 255, 0.8)';
     ctx.fill();
-  };
-
-  const handleContourClick = (event) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const width = canvas.width;
-    const height = canvas.height;
-
-    const wRange = { min: -1, max: 3 };
-    const bRange = { min: -1, max: 5 };
-
-    const newW = wRange.min + (x / width) * (wRange.max - wRange.min);
-    const newB = bRange.max - (y / height) * (bRange.max - bRange.min);
-
-    setCurrentW(newW);
-    setCurrentB(newB);
-    setLoss(calculateLoss(newW, newB));
   };
 
   const chartData = {
@@ -155,7 +142,7 @@ const SimpleLinearRegression = () => {
       {
         label: 'Data Points',
         data: data,
-        backgroundColor: 'rgba(75, 192, 192, 1)',
+        backgroundColor: 'rgba(0, 255, 255, 1)',
       },
       {
         label: 'Regression Line',
@@ -164,7 +151,18 @@ const SimpleLinearRegression = () => {
           { x: 5, y: 5 * currentW + currentB },
         ],
         type: 'line',
-        borderColor: 'rgba(255, 99, 132, 1)',
+        borderColor: (context) => {
+          const chart = context.chart;
+          const {ctx, chartArea} = chart;
+          if (!chartArea) {
+            return null;
+          }
+          const gradient = ctx.createLinearGradient(0, chartArea.bottom, chartArea.right, chartArea.top);
+          gradient.addColorStop(0, 'rgba(0, 255, 255, 1)');
+          gradient.addColorStop(0.5, 'rgba(255, 0, 255, 1)');
+          gradient.addColorStop(1, 'rgba(255, 0, 128, 1)');
+          return gradient;
+        },
         borderWidth: 2,
         fill: false,
       },
@@ -173,41 +171,71 @@ const SimpleLinearRegression = () => {
 
   const options = {
     scales: {
-      x: { min: 0, max: 5 },
-      y: { min: 0, max: 6 },
+      x: { 
+        min: 0, 
+        max: 5,
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+        },
+        ticks: {
+          color: 'rgba(255, 255, 255, 0.8)',
+        },
+      },
+      y: { 
+        min: 0, 
+        max: 6,
+        grid: {
+          color: 'rgba(255, 255, 255, 0.1)',
+        },
+        ticks: {
+          color: 'rgba(255, 255, 255, 0.8)',
+        },
+      },
     },
     animation: { duration: 0 },
     maintainAspectRatio: false,
-  };
-
-  const addRandomDataPoint = () => {
-    const newX = Math.random() * 5;
-    const newY = Math.random() * 6;
-    setData([...data, { x: newX, y: newY }]);
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
   };
 
   return (
-    <div className="container" style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
-      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>Interactive Linear Regression</h2>
+    <div style={{ 
+      maxWidth: '800px', 
+      margin: '0 auto', 
+      padding: '20px', 
+      backgroundColor: '#1e1e2f',
+      color: 'white',
+      fontFamily: 'Arial, sans-serif',
+    }}>
+      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>Neon Interactive Linear Regression</h2>
       
-      <div className="alert" style={{ backgroundColor: '#e0f2fe', borderRadius: '4px', padding: '15px', marginBottom: '20px' }}>
-        <h3 style={{ fontSize: '18px', marginBottom: '10px' }}>Welcome to the Linear Regression Playground!</h3>
-        <p>Click on the contour plot to change the regression line. Add new data points to see how it affects the best fit line.</p>
+      <div style={{ 
+        backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+        borderRadius: '4px', 
+        padding: '15px', 
+        marginBottom: '20px',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+      }}>
+        <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#00ffff' }}>Welcome to the Neon Regression Playground!</h3>
+        <p>Click on the contour plot to change the regression line. Use the slider to interpolate between the initial and best fit line.</p>
       </div>
 
-      <div className="grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-        <div className="card" style={{ border: '1px solid #e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ padding: '15px', borderBottom: '1px solid #e0e0e0' }}>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>Data Points and Regression Line</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+        <div style={{ border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '4px', overflow: 'hidden', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
+          <div style={{ padding: '15px', borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#ff00ff' }}>Data Points and Regression Line</h3>
           </div>
           <div style={{ height: '300px', padding: '15px' }}>
             <Scatter data={chartData} options={options} />
           </div>
         </div>
 
-        <div className="card" style={{ border: '1px solid #e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
-          <div style={{ padding: '15px', borderBottom: '1px solid #e0e0e0' }}>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>Loss Function Contour Plot</h3>
+        <div style={{ border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '4px', overflow: 'hidden', backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
+          <div style={{ padding: '15px', borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#ff00ff' }}>Loss Function Contour Plot</h3>
           </div>
           <div style={{ height: '300px', padding: '15px' }}>
             <canvas 
@@ -215,15 +243,20 @@ const SimpleLinearRegression = () => {
               width={300} 
               height={300} 
               style={{ width: '100%', height: '100%' }}
-              onClick={handleContourClick}
             />
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ border: '1px solid #e0e0e0', borderRadius: '4px', overflow: 'hidden', marginBottom: '20px' }}>
-        <div style={{ padding: '15px', borderBottom: '1px solid #e0e0e0' }}>
-          <h3 style={{ margin: 0, fontSize: '18px' }}>Current Parameters</h3>
+      <div style={{ 
+        border: '1px solid rgba(255, 255, 255, 0.2)', 
+        borderRadius: '4px', 
+        overflow: 'hidden', 
+        marginBottom: '20px',
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      }}>
+        <div style={{ padding: '15px', borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: '#ff00ff' }}>Current Parameters</h3>
         </div>
         <div style={{ padding: '15px' }}>
           <p style={{ textAlign: 'center' }}>
@@ -232,13 +265,25 @@ const SimpleLinearRegression = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
-        <button onClick={addRandomDataPoint} style={{ padding: '10px 15px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          Add Random Data Point
-        </button>
+      <div style={{ 
+        border: '1px solid rgba(255, 255, 255, 0.2)', 
+        borderRadius: '4px', 
+        overflow: 'hidden', 
+        marginBottom: '20px',
+        backgroundColor: 'rgba(0, 0, 0, 0.3)',
+        padding: '15px',
+      }}>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={sliderValue}
+          onChange={(e) => setSliderValue(Number(e.target.value))}
+          style={{ width: '100%' }}
+        />
       </div>
     </div>
   );
 };
 
-export default SimpleLinearRegression;
+export default NeonLinearRegression;
